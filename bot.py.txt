@@ -1,0 +1,62 @@
+import os
+import pandas as pd
+import telebot
+
+# Вставьте ваш токен от BotFather в кавычки ниже:
+TOKEN = 8730665090:AAF8N6XSxUjmsZwrE1qRn6DwJaUDOiuWTp4
+bot = telebot.TeleBot(TOKEN)
+
+
+# Загружаем базу данных сотрудников
+def load_data():
+  file_path = 'Аут сентябрь.xlsx'
+  df1 = pd.read_excel(file_path, sheet_name='Лист1')
+  df2 = pd.read_excel(file_path, sheet_name='Лист2', header=None)
+  df2.columns = ['Исполнитель', 'Головное предприятие']
+  return pd.concat([df1, df2], ignore_index=True)
+
+
+try:
+  df = load_data()
+  print('База данных успешно загружена!')
+except Exception as e:
+  print(f'Ошибка загрузки базы: {e}')
+
+
+# Команда /start
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+  bot.reply_to(
+      message,
+      'Привет! 👋 Я бот для поиска компании сотрудника.\n\nПросто отправь мне'
+      ' фамилию или ФИО (можно частично), и я найду, в какой компании он'
+      ' работает.',
+  )
+
+
+# Поиск по текстовому запросу
+@bot.message_handler(func=lambda message: True)
+def search_employee(message):
+  query = message.text.strip().lower()
+  if not query:
+    return
+
+  res = df[df['Исполнитель'].astype(str).str.lower().str.contains(query, na=False)]
+
+  if res.empty:
+    bot.reply_to(
+        message, '❌ Сотрудники с такой фамилией не найдены в базе.'
+    )
+  else:
+    response_text = f'🔍 Найдено совпадений: {len(res)}\n\n'
+    for _, row in res.iterrows():
+      name = row['Исполнитель']
+      company = row['Головное предприятие']
+      response_text += f'👤 **{name}**\n🏢 Компания: *{company}*\n\n'
+
+    bot.reply_to(message, response_text, parse_mode='Markdown')
+
+
+if __name__ == '__main__':
+  print('Бот запущен...')
+  bot.infinity_polling()
